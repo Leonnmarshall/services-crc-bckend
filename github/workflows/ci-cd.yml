@@ -1,0 +1,59 @@
+name: CI/CD - Backend Node.js
+
+on:
+  push:
+    branches:
+      - main # Roda quando há push na branch principal (main)
+  pull_request:
+    branches:
+      - main # Roda quando há um PR para a branch principal
+
+jobs:
+  # Job de Continuous Integration (Teste)
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Código Fonte
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Versão Node.js recomendada
+
+      - name: Instalar Dependências e Prisma
+        run: npm install
+
+      - name: Rodar Testes
+        run: npm run test
+
+      - name: Gerar Prisma Client (necessário para o Build)
+        run: npx prisma generate
+        env:
+          # O Prisma precisa desta variável para gerar o client
+          DATABASE_URL: ${{ secrets.DATABASE_URL }} 
+
+  # Job de Continuous Deployment (Deploy)
+  deploy:
+    needs: ci # Só roda se o job 'ci' (testes) for bem-sucedido
+    runs-on: ubuntu-latest
+    environment: Production # Ambiente de produção no GitHub
+    
+    steps:
+      # Exemplo de Deploy Genérico (Substitua pela sua plataforma)
+      # Para Railway, Render, ou outros, você usará uma Action específica ou o comando CLI.
+      - name: Exemplo de Deploy (Substituir)
+        run: |
+          echo "Iniciando o Deploy do backend..."
+          # --- Substitua ESTE BLOCO pelo seu comando de deploy real ---
+          # Exemplo para Railway:
+          # curl -X POST -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" "https://api.railway.app/deploy"
+
+          # Exemplo para Render (usando um Webhook):
+          # curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
+
+          echo "Deploy concluído!"
+        env:
+          # Variáveis necessárias para o deploy (Ex: Tokens, Chaves de API)
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # CLOUD_API_KEY: ${{ secrets.CLOUD_API_KEY }}

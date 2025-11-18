@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs"; // Importa a biblioteca de hashing
 
 const app = express();
 const prisma = new PrismaClient();
@@ -8,7 +9,7 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
 
-/* ========= Helpers de validação CPF/CNPJ ========= */
+/* ========= Helpers de validação CPF/CNPJ (MANTIDOS) ========= */
 
 function somenteDigitos(v) {
   return (v || "").replace(/\D/g, "");
@@ -135,12 +136,17 @@ app.post("/usuarios", async (req, res) => {
         .status(409)
         .json({ success: false, message: "E-mail já cadastrado!" });
     }
+    
+    // --- MUDANÇA DE SEGURANÇA: HASH DE SENHA ---
+    const salt = await bcrypt.genSalt(10);
+    const senhaHash = await bcrypt.hash(senha, salt);
+    // ------------------------------------------
 
     const user = await prisma.user.create({
       data: {
         nome,
         email,
-        senhaHash: senha,
+        senhaHash: senhaHash, // Salva o hash da senha
         instituicao,
         profissao,
         cargoAreaAtuacao,
@@ -173,7 +179,9 @@ app.post("/usuarios", async (req, res) => {
 app.get("/usuarios", async (req, res) => {
   try {
     const users = await prisma.user.findMany();
-    return res.status(200).json({ success: true, users });
+    // Recomenda-se não retornar o campo 'senhaHash'
+    const safeUsers = users.map(({ senhaHash, ...user }) => user);
+    return res.status(200).json({ success: true, users: safeUsers });
   } catch (err) {
     console.error(err);
     return res
@@ -197,11 +205,21 @@ app.post("/login", async (req, res) => {
       where: { email },
     });
 
-    if (!user || user.senhaHash !== senha) {
+    if (!user) {
       return res
         .status(401)
         .json({ success: false, message: "Credenciais inválidas." });
     }
+    
+    // --- MUDANÇA DE SEGURANÇA: COMPARAÇÃO DE HASH ---
+    const senhaValida = await bcrypt.compare(senha, user.senhaHash);
+
+    if (!senhaValida) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Credenciais inválidas." });
+    }
+    // ------------------------------------------------
 
     return res.json({
       success: true,
@@ -222,7 +240,8 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// START
-app.listen(3000, () => {
-  console.log("🚀 Servidor rodando em: http://localhost:3000");
+// START (PORTA AJUSTADA PARA PRODUÇÃO)
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor rodando em: http://localhost:${PORT}`);
 });
