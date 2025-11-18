@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* marcador colorido usado na página */
+ul.list-disc > li::marker,
+ul.list-[square] > li::marker {
+  color: #00a4d6;
+}
