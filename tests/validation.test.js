@@ -1,4 +1,4 @@
-import { validarCPF, validarCNPJ } from '../server.js'; // Você pode precisar exportar essas funções em server.js ou ajustá-las para importação
+import { validarCPF } from '../server.js'; // Você pode precisar exportar essas funções em server.js ou ajustá-las para importação
 
 describe('Validação de Documentos', () => {
   // Mock de um caso de teste (mude os valores para reais)

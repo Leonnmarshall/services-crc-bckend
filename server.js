@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs"; // Importa a biblioteca de hashing
+import bcrypt from "bcryptjs"; // [1] Importa a biblioteca de hashing de senha
 
 const app = express();
 const prisma = new PrismaClient();
@@ -9,17 +9,17 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
 
-/* ========= Helpers de validação CPF/CNPJ (MANTIDOS) ========= */
+/* ========= Helpers de validação CPF/CNPJ (EXPORTADOS para Testes) ========= */
 
-function somenteDigitos(v) {
+export function somenteDigitos(v) { // Exportado para testes
   return (v || "").replace(/\D/g, "");
 }
 
-function todosIguais(str) {
+export function todosIguais(str) { // Exportado para testes
   return str.split("").every((c) => c === str[0]);
 }
 
-function validarCPF(cpf) {
+export function validarCPF(cpf) { // Exportado para testes
   const digits = somenteDigitos(cpf);
   if (digits.length !== 11) return false;
   if (todosIguais(digits)) return false;
@@ -47,7 +47,7 @@ function validarCPF(cpf) {
   return true;
 }
 
-function validarCNPJ(cnpj) {
+export function validarCNPJ(cnpj) { // Exportado para testes
   const digits = somenteDigitos(cnpj);
   if (digits.length !== 14) return false;
   if (todosIguais(digits)) return false;
@@ -84,13 +84,13 @@ app.get("/", (req, res) => {
   res.json({ message: "API rodando 🚀" });
 });
 
-// CADASTRO
+// CADASTRO (Implementação de HASH)
 app.post("/usuarios", async (req, res) => {
   try {
     const {
       nome,
       email,
-      senha,
+      senha, // Senha em texto puro
       instituicao,
       profissao,
       cargoAreaAtuacao,
@@ -115,7 +115,7 @@ app.post("/usuarios", async (req, res) => {
       });
     }
 
-    // Validação de tipoPessoa + CPF/CNPJ
+    // Validação de tipoPessoa + CPF/CNPJ (MANTIDA)
     if (tipoPessoa === "fisica") {
       if (!cpf || !validarCPF(cpf)) {
         return res
@@ -136,17 +136,16 @@ app.post("/usuarios", async (req, res) => {
         .status(409)
         .json({ success: false, message: "E-mail já cadastrado!" });
     }
-    
-    // --- MUDANÇA DE SEGURANÇA: HASH DE SENHA ---
+
+    // [2] Criação do HASH da senha
     const salt = await bcrypt.genSalt(10);
     const senhaHash = await bcrypt.hash(senha, salt);
-    // ------------------------------------------
 
     const user = await prisma.user.create({
       data: {
         nome,
         email,
-        senhaHash: senhaHash, // Salva o hash da senha
+        senhaHash: senhaHash, // Salva o HASH, não a senha em texto puro
         instituicao,
         profissao,
         cargoAreaAtuacao,
@@ -167,7 +166,13 @@ app.post("/usuarios", async (req, res) => {
     return res.status(201).json({
       success: true,
       message: "Usuário criado com sucesso!",
-      user,
+      // Recomenda-se não retornar o objeto 'user' completo
+      user: {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+        tipoPessoa: user.tipoPessoa
+      }
     });
   } catch (err) {
     console.error(err);
@@ -175,11 +180,11 @@ app.post("/usuarios", async (req, res) => {
   }
 });
 
-// LISTAGEM
+// LISTAGEM (Removendo o HASH da resposta)
 app.get("/usuarios", async (req, res) => {
   try {
     const users = await prisma.user.findMany();
-    // Recomenda-se não retornar o campo 'senhaHash'
+    // [3] Mapeia e remove o campo senhaHash antes de enviar a resposta
     const safeUsers = users.map(({ senhaHash, ...user }) => user);
     return res.status(200).json({ success: true, users: safeUsers });
   } catch (err) {
@@ -190,7 +195,7 @@ app.get("/usuarios", async (req, res) => {
   }
 });
 
-// LOGIN
+// LOGIN (Implementação de COMPARAÇÃO DE HASH)
 app.post("/login", async (req, res) => {
   try {
     const { email, senha } = req.body;
@@ -211,7 +216,7 @@ app.post("/login", async (req, res) => {
         .json({ success: false, message: "Credenciais inválidas." });
     }
     
-    // --- MUDANÇA DE SEGURANÇA: COMPARAÇÃO DE HASH ---
+    // [4] Compara a senha fornecida com o hash salvo
     const senhaValida = await bcrypt.compare(senha, user.senhaHash);
 
     if (!senhaValida) {
@@ -219,7 +224,6 @@ app.post("/login", async (req, res) => {
         .status(401)
         .json({ success: false, message: "Credenciais inválidas." });
     }
-    // ------------------------------------------------
 
     return res.json({
       success: true,
@@ -240,7 +244,7 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// START (PORTA AJUSTADA PARA PRODUÇÃO)
+// START (Porta configurada para Produção/Deploy)
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando em: http://localhost:${PORT}`);
