@@ -1,0 +1,37 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  nome             String
+  email            String   @unique
+  senhaHash        String
+
+  instituicao      String?
+  profissao        String?
+  cargoAreaAtuacao String
+  organizacaoNome  String
+
+  cep         String?
+  logradouro  String?
+  numero      String?
+  bairro      String?
+  cidade      String?
+  uf          String?
+  complemento String?
+
+  // 🔹 Novos campos
+  tipoPessoa  String?  // "fisica" ou "juridica"
+  cpf         String?  // somente para pessoa física
+  cnpj        String?  // somente para pessoa jurídica
+
+  createdAt   DateTime @default(now())
+}
